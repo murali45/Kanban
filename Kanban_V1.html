@@ -1,0 +1,1944 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Offline Kanban Board</title>
+    <style>
+        /* Base and Layout Styles (Replaces Tailwind Utilities) */
+        body {
+            background-color: #f3f4f6; /* bg-gray-100 */
+            min-height: 100vh; /* min-h-screen */
+            padding: 1rem; /* p-4 */
+            font-family: Inter, sans-serif;
+        }
+
+        .container-wrapper {
+            max-width: 80rem; /* max-w-7xl */
+            margin: 0 auto; /* mx-auto */
+            padding-left: 1rem;
+            padding-right: 1rem;
+        }
+
+        /* Header and Controls Styling */
+        .app-header {
+            margin-bottom: 2rem; /* mb-8 */
+            padding: 1rem; /* p-4 */
+            background-color: white;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.1); /* shadow-lg */
+            border-radius: 0.5rem; /* rounded-lg */
+            display: block; /* Use block to manage vertical rows */
+        }
+        
+        /* .header-title CSS removed as the H1 is deleted */
+        
+        /* New Container for all controls below the title */
+        .control-container {
+             width: 100%;
+             display: flex;
+             flex-direction: column;
+             gap: 1rem; /* Space between the rows */
+        }
+        
+        /* Row for primary controls */
+        .control-row {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 0.75rem; /* Space between boxes/buttons in the row */
+            justify-content: flex-start; /* MODIFIED: Push controls to the left on desktop */
+        }
+        
+        /* Styles for the rectangular boxes */
+        .control-box {
+            padding: 0.75rem;
+            border: 2px solid #e5e7eb; /* Light grey border */
+            border-radius: 0.5rem;
+            background-color: #f9fafb; /* Very light background for distinction */
+            box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+            display: flex;
+            align-items: center; /* Ensure vertical centering inside the box */
+            gap: 0.75rem;
+        }
+
+        /* Responsive adjustments for control boxes */
+        @media (max-width: 1024px) {
+            .control-row {
+                justify-content: center; /* Center boxes on tablet/mobile */
+            }
+            .control-box {
+                flex-wrap: wrap; /* Allow elements inside boxes to wrap */
+                min-width: 95%; /* Make boxes fill most of the width */
+                justify-content: center;
+            }
+            .filter-label {
+                width: 100%; /* Make label full width inside the filter box */
+                text-align: center;
+                margin-bottom: 0.5rem;
+            }
+        }
+        
+        .filter-label {
+             font-weight: 700;
+             color: #4f46e5;
+             white-space: nowrap; /* Prevent wrapping on desktop */
+        }
+        
+        /* General Button Styles */
+        .btn {
+            font-weight: 600;
+            padding: 0.5rem 1rem;
+            border-radius: 0.5rem;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            transition: background-color 0.2s;
+            /* Ensure buttons inside boxes don't have external margins */
+            margin: 0; 
+        }
+        .btn-export {
+            background-color: #10b981; /* bg-green-600 */
+            color: white;
+        }
+        .btn-export:hover {
+            background-color: #059669; /* hover:bg-green-700 */
+        }
+        .btn-add {
+            background-color: #4f46e5; /* bg-indigo-600 */
+            color: white;
+        }
+        .btn-add:hover {
+            background-color: #4338ca; /* hover:bg-indigo-700 */
+        }
+        .btn-data {
+            background-color: #3b82f6; /* bg-blue-500 */
+            color: white;
+        }
+        .btn-data:hover {
+            background-color: #2563eb; /* hover:bg-blue-600 */
+        }
+        
+        /* NEW/MODIFIED Filter Button Color */
+        .btn-filter {
+            background-color: #6366f1; /* Indigo-400 equivalent for filter action */
+            color: white;
+        }
+        .btn-filter:hover {
+             background-color: #4f46e5;
+        }
+        
+        .btn-clear {
+             background-color: #f59e0b; 
+             color: white;
+        }
+        .btn-clear:hover {
+             background-color: #d97706; 
+        }
+
+        .export-filter-select {
+            padding: 0.5rem;
+            border: 1px solid #d1d5db;
+            border-radius: 0.5rem;
+            font-weight: 500;
+            background-color: white;
+            margin: 0; /* Important: remove default margins */
+        }
+        
+        /* Specific styling for the date inputs to ensure consistency */
+        input[type="date"].export-filter-select {
+            padding: 0.45rem 0.75rem; /* Adjust padding slightly for date inputs */
+            line-height: 1.25; /* Help vertical alignment */
+        }
+
+
+        /* Kanban Board Container */
+        .kanban-board-layout {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 1.5rem; /* gap-6 */
+            height: 75vh;
+        }
+        @media (min-width: 1024px) {
+            .kanban-board-layout {
+                flex-wrap: nowrap;
+            }
+        }
+
+        /* Custom Styles for Kanban columns and tasks */
+        .kanban-column {
+            min-width: 300px;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            background-color: #f7f9fc;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.06);
+            border-radius: 0.5rem;
+            padding: 1rem;
+            flex: 1 1 auto; /* flex-1 */
+        }
+
+        @media (max-width: 1024px) {
+            .kanban-board-layout {
+                flex-direction: column;
+                align-items: center;
+                height: auto;
+            }
+            .kanban-column {
+                margin-bottom: 1.5rem;
+                width: 95%;
+                max-width: 400px;
+                min-width: unset;
+                height: auto;
+            }
+        }
+
+        .column-header {
+            font-size: 1.25rem; /* text-xl */
+            font-weight: 700; /* font-bold */
+            margin-bottom: 1rem; /* mb-4 */
+            padding: 0.5rem; /* p-2 */
+            color: white;
+            border-radius: 0.5rem; /* rounded-lg */
+            box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1); /* shadow-md */
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .task-list-container {
+            flex-grow: 1;
+            overflow-y: auto;
+            padding-right: 0.5rem;
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem; /* space-y-3 */
+        }
+
+        /* Default Card Style */
+        .task-card {
+            cursor: grab;
+            transition: all 0.2s ease;
+            box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
+            background-color: white;
+            padding: 0.75rem; /* p-3 */
+            border-radius: 0.5rem; /* rounded-lg */
+            border-left: 4px solid #818cf8; /* border-l-4 border-indigo-400 */
+            font-size: 0.875rem; /* text-sm */
+            position: relative; /* Needed for absolute positioning of warning icon */
+        }
+        .task-card:active {
+            cursor: grabbing;
+        }
+        .task-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.06);
+            border-left-color: #4f46e5; /* hover:border-indigo-600 */
+        }
+        
+        /* Highlight Style for Due/Overdue Tasks */
+        .task-overdue {
+            border-left: 8px solid #ef4444; /* Thicker red border */
+            background-color: #fef2f2; /* Light red background */
+            animation: pulse-red 1.5s infinite; /* Gentle pulse */
+        }
+        
+        .task-overdue:hover {
+            border-left-color: #b91c1c;
+        }
+        
+        /* Animation for drawing attention */
+        @keyframes pulse-red {
+            0%, 100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.3); }
+            50% { box-shadow: 0 0 0 4px rgba(239, 68, 68, 0.0); }
+        }
+
+        /* Priority Colors */
+        .priority-high { color: #dc2626; font-weight: 700; } /* Red */
+        .priority-medium { color: #f59e0b; font-weight: 600; } /* Orange */
+        .priority-low { color: #10b981; font-weight: 500; } /* Green */
+        .priority-default { color: #9ca3af; font-weight: 400; } /* Gray */
+
+
+        .drag-over {
+            border: 3px dashed #3b82f6;
+            background-color: #eff6ff;
+        }
+
+        /* Modal Styles */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: rgba(17, 24, 39, 0.75); /* bg-gray-900 bg-opacity-75 */
+            z-index: 50;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 1rem;
+        }
+        .modal-content {
+            background-color: white;
+            padding: 1.5rem; /* p-6 */
+            border-radius: 0.75rem; /* rounded-xl */
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1); /* shadow-2xl */
+            width: 100%;
+            max-width: 42rem; /* max-w-2xl */
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+        .input-field {
+            width: 100%;
+            padding: 0.75rem;
+            border: 1px solid #d1d5db;
+            border-radius: 0.5rem;
+            margin-bottom: 1rem;
+            transition: border-color 0.2s, box-shadow 0.2s;
+        }
+        .input-field:focus {
+            border-color: #4f46e5;
+            box-shadow: 0 0 0 1px #4f46e5;
+        }
+        
+        /* Utility for scrollable task container */
+        .task-list-container::-webkit-scrollbar {
+            width: 8px;
+        }
+        .task-list-container::-webkit-scrollbar-thumb {
+            background-color: #d1d5db;
+            border-radius: 10px;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 min-h-screen p-4 lg:p-8 font-sans">
+
+    <header class="app-header container-wrapper">
+        
+        <div class="control-container">
+            
+            <!-- ROW 1: Data Management, CSV Export, and Add Task (Aligned Left) -->
+            <div class="control-row">
+                
+                <!-- BOX 1: JSON Data Management -->
+                <div class="control-box">
+                    <button onclick="document.getElementById('importDataFile').click()" class="btn btn-data">
+                        Import Data (JSON)
+                    </button>
+                    <button onclick="exportDataJson()" class="btn btn-data">
+                        Export Data File (JSON)
+                    </button>
+                    <!-- Hidden Input -->
+                    <input type="file" id="importDataFile" style="display: none;" accept=".json" onchange="promptImportMode(event)">
+                </div>
+                
+                <!-- BOX 2: CSV Export -->
+                <div class="control-box">
+                    <select id="exportFilterSelect" class="export-filter-select">
+                        <option value="all">Export All Tasks</option>
+                        <option value="done">Only Export 'Done'</option>
+                        <option value="todo">Only Export 'To Do'</option>
+                        <option value="in-progress">Only Export 'In Progress'</option>
+                        <option value="waiting-response">Only Export 'Waiting for Response'</option>
+                    </select>
+                    <button id="exportBtn" class="btn btn-export">
+                        Export Data (.csv)
+                    </button>
+                </div>
+                
+                <!-- Add Task Button (Kept separate from boxes) -->
+                <button onclick="document.getElementById('newTaskModal').classList.remove('hidden'); document.getElementById('newTaskModal').style.display='flex';" class="btn btn-add">
+                    + Add New Task
+                </button>
+            </div>
+            
+            <!-- ROW 2: Custom Activity Filter (Stretched) -->
+            <div class="control-row" style="justify-content: flex-start;">
+                
+                <!-- BOX 3: Custom Activity Filter -->
+                <div class="control-box" style="flex-grow: 1; justify-content: flex-start;">
+                    <span class="filter-label">Filter By Activity Date:</span>
+                    <input type="date" id="activityDateFrom" class="export-filter-select" title="From Date">
+                    <input type="date" id="activityDateTo" class="export-filter-select" title="To Date">
+                    <button onclick="applyCustomDateFilter()" class="btn btn-filter">
+                        Filter
+                    </button>
+                    <button onclick="clearActivityFilter()" class="btn btn-clear">
+                        Clear Filter
+                    </button>
+                    <!-- REINSTATED TITLE HERE (Pushed right using margin-left: auto) -->
+                    <h1 style="font-size: 1.5rem; font-weight: 700; color: #4f46e5; margin-left: auto; margin: 0;">
+                        Offline Kanban Tool
+                    </h1>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <main id="kanbanBoard" class="kanban-board-layout container-wrapper" style="padding: 0 1rem;">
+    </main>
+
+    <div id="newTaskModal" class="hidden modal-overlay" style="display: none;" onclick="if(event.target.id === 'newTaskModal') this.classList.add('hidden')">
+        <div class="modal-content" style="max-width: 28rem;">
+            <h2 class="text-2xl font-bold mb-4" style="color: #4f46e5;">Add New Task</h2>
+            <label for="newTaskTitle" style="font-weight: 600; color: #374151; font-size: 0.875rem;">Task Title (Required)</label>
+            <input type="text" id="newTaskTitle" placeholder="Enter task title (e.g., Design UI)" class="input-field">
+            
+            <label for="newTaskPriority" style="font-weight: 600; color: #374151; font-size: 0.875rem;">Priority</label>
+            <select id="newTaskPriority" class="input-field" style="margin-bottom: 1rem;">
+                <option value="Medium">Medium</option>
+                <option value="High">High</option>
+                <option value="Low">Low</option>
+            </select>
+
+            <label for="newTaskAssignedTo" style="font-weight: 600; color: #374151; font-size: 0.875rem;">Assigned To (Optional)</label>
+            <input type="text" id="newTaskAssignedTo" placeholder="E.g., John Doe" class="input-field">
+
+            <label for="newTaskTargetDate" style="font-weight: 600; color: #374151; font-size: 0.875rem;">Target Date (Optional)</label>
+            <input type="date" id="newTaskTargetDate" class="input-field">
+            
+            <label for="newTaskEmailSubject" style="font-weight: 600; color: #374151; font-size: 0.875rem;">Email Subject (Optional)</label>
+            <input type="text" id="newTaskEmailSubject" placeholder="Reference email subject line" class="input-field">
+            
+            <label for="newTaskDescription" style="font-weight: 600; color: #374151; font-size: 0.875rem;">Detailed Description/Notes (Optional)</label>
+            <textarea id="newTaskDescription" placeholder="Add detailed instructions or notes for this task..." class="input-field" style="min-height: 80px;"></textarea>
+            <div style="display: flex; justify-content: flex-end; gap: 0.75rem; margin-top: 1rem;">
+                <button onclick="document.getElementById('newTaskModal').classList.add('hidden'); document.getElementById('newTaskModal').style.display='none';" style="padding: 0.5rem 1rem; background-color: #d1d5db; color: #1f2937; border-radius: 0.5rem; transition: background-color 0.2s;">Cancel</button>
+                <button id="addTaskBtn" style="padding: 0.5rem 1rem; background-color: #4f46e5; color: white; border-radius: 0.5rem; transition: background-color 0.2s;">Add Task</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="taskDetailModal" class="hidden modal-overlay" style="display: none;" onclick="if(event.target.id === 'taskDetailModal') closeTaskDetails()">
+        <div class="modal-content" style="max-width: 42rem;">
+            <div style="display: flex; flex-direction: column; margin-bottom: 1rem;">
+                
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+                    <div id="taskTitleContainer" style="display: flex; align-items: center; flex-grow: 1; max-width: 90%;">
+                        <h2 id="modalTaskTitleDisplay" style="font-size: 1.875rem; font-weight: 800; color: #4f46e5; max-width: 100%; word-wrap: break-word;"></h2>
+                        <input type="text" id="modalTaskTitleInput" class="input-field" style="display: none; font-size: 1.875rem; font-weight: 800; color: #4f46e5; padding: 0.25rem 0.5rem; margin: 0; border: 1px solid #4f46e5;"/>
+                        <button id="editTitleBtn" onclick="toggleEditMode(true)" style="margin-left: 0.5rem; color: #4f46e5; font-size: 1rem; cursor: pointer;">
+                            &#9998; </button>
+                    </div>
+                    <button onclick="closeTaskDetails()" style="color: #9ca3af; font-size: 1.5rem; font-weight: 700;">&times;</button>
+                </div>
+                
+                <button id="saveTitleBtn" onclick="saveTaskTitleAndDescription()" style="display: none; padding: 0.3rem 0.75rem; background-color: #10b981; color: white; font-weight: 600; border-radius: 0.5rem; transition: background-color 0.2s; width: 100%; margin-top: 0.5rem;">
+                    Save Changes
+                </button>
+
+            </div>
+
+            <div style="margin-bottom: 1rem;">
+                <div style="display: flex; align-items: center; margin-bottom: 0.5rem; padding-top: 0.25rem;">
+                    <p style="font-size: 0.875rem; font-weight: 600; color: #6b7280; margin-right: 0.5rem; min-width: 80px;">Status:</p>
+                    <span id="modalTaskStatusDisplay" style="font-weight: 700; font-size: 1.125rem; color: #2563eb; flex-grow: 1;"></span>
+                    
+                    <select id="modalTaskStatusInput" class="input-field" style="width: 150px; margin: 0; padding: 0.25rem; font-size: 0.875rem; display: none;">
+                        <option value="todo">To Do</option>
+                        <option value="in-progress">In Progress</option>
+                        <option value="waiting-response">Waiting for Response</option>
+                        <option value="done">Done</option>
+                    </select>
+
+                    <button id="toggleStatusEditBtn" onclick="toggleStatusEditMode(true)" style="margin-left: 0.5rem; color: #4f46e5; font-size: 1rem; cursor: pointer; display: block;">&#9998;</button>
+                    <button id="saveStatusBtn" onclick="saveTaskStatus()" style="margin-left: 0.5rem; padding: 0.3rem 0.75rem; background-color: #10b981; color: white; font-weight: 600; border-radius: 0.5rem; transition: background-color 0.2s; display: none; font-size: 0.8rem;">Save Status</button>
+                </div>
+                <p style="font-size: 0.875rem; font-weight: 600; color: #6b7280;">Task ID: <span id="modalTaskId" style="font-weight: 400; color: #374151;"></span></p>
+                
+                <div style="display: flex; align-items: center; margin-bottom: 0.5rem; padding-top: 0.25rem;">
+                    <p style="font-size: 0.875rem; font-weight: 600; color: #6b7280; margin-right: 0.5rem; min-width: 80px;">Priority:</p>
+                    <span id="modalTaskPriorityDisplay" class="priority-default" style="flex-grow: 1;">N/A</span>
+                    <select id="modalTaskPriorityInput" class="input-field" style="width: 150px; margin: 0; padding: 0.25rem; font-size: 0.875rem; display: none;">
+                        <option value="High">High</option>
+                        <option value="Medium">Medium</option>
+                        <option value="Low">Low</option>
+                    </select>
+
+                    <button id="togglePriorityEditBtn" onclick="togglePriorityEditMode(true)" style="margin-left: 0.5rem; color: #4f46e5; font-size: 1rem; cursor: pointer; display: block;">&#9998;</button>
+                    <button id="savePriorityBtn" onclick="savePriority()" style="margin-left: 0.5rem; padding: 0.3rem 0.75rem; background-color: #10b981; color: white; font-weight: 600; border-radius: 0.5rem; transition: background-color 0.2s; display: none; font-size: 0.8rem;">Save Priority</button>
+                </div>
+
+                <div style="display: flex; align-items: center; margin-bottom: 0.5rem; padding-top: 0.25rem;">
+                    <p style="font-size: 0.875rem; font-weight: 600; color: #6b7280; margin-right: 0.5rem; min-width: 80px;">Attn to:</p>
+                    <span id="modalTaskAssignedToDisplay" style="font-weight: 400; color: #374151; flex-grow: 1;">N/A</span>
+                    <input type="text" id="modalTaskAssignedToInput" class="input-field" style="flex-grow: 1; margin: 0; padding: 0.25rem; font-size: 0.875rem; display: none;">
+                    
+                    <button id="toggleAssignedToEditBtn" onclick="toggleAssignedToEditMode(true)" style="margin-left: 0.5rem; color: #4f46e5; font-size: 1rem; cursor: pointer; display: block;">&#9998;</button>
+                    <button id="saveAssignedToBtn" onclick="saveAssignedTo()" style="margin-left: 0.5rem; padding: 0.3rem 0.75rem; background-color: #10b981; color: white; font-weight: 600; border-radius: 0.5rem; transition: background-color 0.2s; display: none; font-size: 0.8rem;">Save Assignee</button>
+                </div>
+
+                <div style="display: flex; align-items: center; margin-bottom: 0.5rem; padding-top: 0.25rem;">
+                    <p style="font-size: 0.875rem; font-weight: 600; color: #6b7280; margin-right: 0.5rem; min-width: 80px;">Target Date:</p>
+                    <span id="modalTaskTargetDateDisplay" style="font-weight: 400; color: #374151; flex-grow: 1;"></span>
+                    <input type="date" id="modalTaskTargetDateInput" class="input-field" style="width: 150px; margin: 0; padding: 0.25rem; font-size: 0.875rem; display: none;">
+                    
+                    <button id="toggleDateEditBtn" onclick="toggleDateEditMode(true)" style="margin-left: 0.5rem; color: #4f46e5; font-size: 1rem; cursor: pointer; display: block;">&#9998;</button>
+                    <button id="saveDateBtn" onclick="saveTargetDate()" style="margin-left: 0.5rem; padding: 0.3rem 0.75rem; background-color: #10b981; color: white; font-weight: 600; border-radius: 0.5rem; transition: background-color 0.2s; display: none; font-size: 0.8rem;">Save Date</button>
+                </div>
+                
+                <div style="display: flex; align-items: center; margin-bottom: 0.5rem; padding-top: 0.25rem;">
+                    <p style="font-size: 0.875rem; font-weight: 600; color: #6b7280; margin-right: 0.5rem; min-width: 80px;">Email Subject:</p>
+                    <span id="modalTaskEmailSubjectDisplay" style="font-weight: 400; color: #374151; flex-grow: 1;"></span>
+                    <input type="text" id="modalTaskEmailSubjectInput" class="input-field" style="flex-grow: 1; margin: 0; padding: 0.25rem; font-size: 0.875rem; display: none;" />
+                    
+                    <button id="toggleSubjectEditBtn" onclick="toggleSubjectEditMode(true)" style="margin-left: 0.5rem; color: #4f46e5; font-size: 1rem; cursor: pointer; display: block;">&#9998;</button>
+                    <button id="saveSubjectBtn" onclick="saveEmailSubject()" style="margin-left: 0.5rem; padding: 0.3rem 0.75rem; background-color: #10b981; color: white; font-weight: 600; border-radius: 0.5rem; transition: background-color 0.2s; display: none; font-size: 0.8rem;">Save Subject</button>
+                </div>
+
+            </div>
+            
+            <div style="margin-bottom: 1.5rem;">
+                <h3 style="font-size: 1.1rem; font-weight: 700; color: #1f2937; margin-bottom: 0.5rem;">Description</h3>
+                <div id="descriptionContainer" style="display: flex; align-items: flex-start;"> 
+                    <div id="modalTaskDescriptionDisplay" style="padding: 0.75rem; background-color: #f9fafb; border-radius: 0.5rem; border: 1px solid #e5e7eb; min-height: 50px; white-space: pre-wrap; word-wrap: break-word; color: #374151; flex-grow: 1;">
+                        No description provided.
+                    </div>
+                    <button id="editDescriptionBtn" onclick="toggleDescriptionEditMode(true)" style="margin-left: 0.5rem; color: #4f46e5; font-size: 1rem; cursor: pointer; padding: 0.25rem;">
+                        &#9998; </button>
+                </div>
+                <textarea id="modalTaskDescriptionInput" class="input-field" style="display: none; min-height: 120px; margin-top: 0.5rem;"></textarea>
+            </div>
+
+            <div style="background-color: #f9fafb; padding: 1rem; border-radius: 0.5rem; margin-bottom: 1.5rem; box-shadow: inset 0 2px 4px 0 rgba(0, 0, 0, 0.06);">
+                <h3 style="font-size: 1.25rem; font-weight: 700; color: #1f2937; margin-bottom: 0.75rem;">Add Comment</h3>
+                <textarea id="commentInput" placeholder="Type your comment here..." class="input-field" style="min-height: 80px;"></textarea>
+                <button id="addCommentBtn" style="padding: 0.5rem 1rem; background-color: #2563eb; color: white; font-weight: 600; border-radius: 0.5rem; transition: background-color 0.2s;">Post Comment</button>
+            </div>
+
+            <button id="deleteTaskBtn" onclick="deleteTask(currentTask.id)" style="padding: 0.5rem 1rem; background-color: #ef4444; color: white; font-weight: 600; border-radius: 0.5rem; transition: background-color 0.2s; width: 100%; margin-top: 1.5rem; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);">
+                Delete Task Permanently
+            </button>
+            
+            <div style="margin-top: 1.5rem;">
+                <h3 style="font-size: 1.25rem; font-weight: 700; color: #1f2937; margin-bottom: 0.75rem;">Activity History</h3>
+                <ul id="historyList" style="display: flex; flex-direction: column; gap: 0.75rem;">
+                    </ul>
+                <p id="noHistoryMessage" style="color: #6b7280; font-style: italic; display: none;">No activity logged yet.</p>
+            </div>
+        </div>
+    </div>
+    
+    <div id="messageAlertModal" class="hidden modal-overlay" style="display: none;" onclick="this.classList.add('hidden')">
+        <div class="modal-content" style="max-width: 25rem;">
+            <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1rem;">
+                <h2 id="alertTitle" style="font-size: 1.5rem; font-weight: 700; color: #ef4444;">Warning</h2>
+                <button onclick="document.getElementById('messageAlertModal').classList.add('hidden')" style="color: #9ca3af; font-size: 1.5rem; font-weight: 700;">&times;</button>
+            </div>
+            <p id="alertMessage" style="margin-bottom: 1.5rem; color: #1f2937;"></p>
+            <button onclick="document.getElementById('messageAlertModal').classList.add('hidden')" style="padding: 0.5rem 1rem; background-color: #4f46e5; color: white; border-radius: 0.5rem; width: 100%; transition: background-color 0.2s;">OK</button>
+             <div class="temp-buttons-container" style="display: none; justify-content: space-between; margin-top: 1.5rem;"></div>
+        </div>
+    </div>
+    
+    <div id="importConfirmModal" class="hidden modal-overlay" style="display: none;" onclick="this.classList.add('hidden')">
+        <div class="modal-content" style="max-width: 30rem;">
+            <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1rem;">
+                <h2 style="font-size: 1.5rem; font-weight: 700; color: #4f46e5;">Import Options</h2>
+                <button onclick="document.getElementById('importConfirmModal').classList.add('hidden')" style="color: #9ca3af; font-size: 1.5rem; font-weight: 700;">&times;</button>
+            </div>
+            <p style="margin-bottom: 1.5rem; color: #1f2937;">
+                How would you like to handle the imported data?
+            </p>
+            <div style="display: flex; flex-direction: column; gap: 1rem;">
+                <button onclick="handleImportDecision('merge')" style="padding: 0.75rem; background-color: #10b981; color: white; font-weight: 600; border-radius: 0.5rem;">
+                    Merge (Keep existing tasks, add imported ones)
+                </button>
+                <button onclick="handleImportDecision('overwrite')" style="padding: 0.75rem; background-color: #ef4444; color: white; font-weight: 600; border-radius: 0.5rem;">
+                    Overwrite (Delete all existing tasks and replace)
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Constants and State
+        const STORAGE_KEY = 'kanbanTasks';
+        const BOARD_COLUMNS = [
+            { id: 'todo', title: 'To Do', color: '#ef4444' }, /* Red */
+            { id: 'in-progress', title: 'In Progress', color: '#f59e0b' }, /* Orange/Yellow */
+            { id: 'waiting-response', title: 'Waiting for Response', color: '#9333ea' }, /* Violet/Purple */
+            { id: 'done', title: 'Done', color: '#10b981' } /* Green */
+        ];
+
+        let tasks = [];
+        let importedData = null; // Temporary holder for data being imported
+        let currentTask = null; // Task being viewed in the modal
+        
+        // New state variable to hold the active custom date range filter
+        let currentActivityRange = null; 
+        
+        // Priority mapping for sorting (Higher number means higher priority)
+        const PRIORITY_MAP = {
+            'High': 3,
+            'Medium': 2,
+            'Low': 1
+        };
+        const PRIORITY_COLOR_MAP = {
+            'High': '#dc2626', // Red
+            'Medium': '#f59e0b', // Orange
+            'Low': '#10b981' // Green
+        };
+        
+        // Helper to map status ID to display name for modal updates
+        const STATUS_DISPLAY_MAP = BOARD_COLUMNS.reduce((acc, col) => {
+            acc[col.id] = col.title.toUpperCase();
+            return acc;
+        }, {});
+        
+        // Helper to map status ID to a default color for status display
+        const STATUS_COLOR_MAP = BOARD_COLUMNS.reduce((acc, col) => {
+            acc[col.id] = col.color;
+            return acc;
+        }, {});
+
+
+        // --- Utility Functions ---
+
+        const generateId = () => Date.now().toString(36) + Math.random().toString(36).substr(2, 5);
+
+        const formatDate = (timestamp) => {
+            if (!timestamp) return 'N/A';
+            const date = new Date(timestamp);
+            return date.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+        };
+        
+        const formatTargetDate = (dateString) => {
+             if (!dateString) return 'N/A';
+             // For display, use DD/MM/YYYY
+             const [year, month, day] = dateString.split('-');
+             return `${day}/${month}/${year}`;
+        }
+        
+        // Helper to check if a task is overdue (today or past) and not completed
+        const isOverdue = (task) => {
+            if (!task.targetDate || task.status === 'done') return false;
+            
+            // Normalize dates to the start of the day for comparison
+            const targetDate = new Date(task.targetDate);
+            targetDate.setHours(0, 0, 0, 0); 
+            
+            const today = new Date();
+            today.setHours(0, 0, 0, 0); 
+
+            // Check if target date is today or in the past
+            return targetDate <= today;
+        };
+        
+        // Helper to check if a task has *any* history within a range
+        const hasActivityInRange = (task, range) => {
+            if (!task.history || task.history.length === 0) return false;
+            
+            return task.history.some(item => {
+                return item.timestamp >= range.start && item.timestamp <= range.end;
+            });
+        };
+        
+        const saveTasks = () => {
+            try {
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(tasks));
+            } catch (error) {
+                console.error("Could not save to local storage:", error);
+            }
+        };
+
+        const loadTasks = () => {
+            const storedTasks = localStorage.getItem(STORAGE_KEY);
+            tasks = storedTasks ? JSON.parse(storedTasks) : [];
+        };
+
+        const logHistory = (task, type, details = {}) => {
+            task.history.push({
+                timestamp: Date.now(),
+                type: type, // 'created', 'status_change', 'comment', 'reopened', 'title_edit', 'description_edit', 'target_date_edit', 'priority_edit', 'email_subject_edit', 'assigned_to_edit'
+                details: details
+            });
+            saveTasks();
+        };
+        
+        // --- Manual Data Control Functions ---
+        
+        // Dedicated function to show alerts without confusing the main detail modal
+        const showMessage = (message, title = "Warning") => {
+            const modal = document.getElementById('messageAlertModal');
+            const defaultButton = modal.querySelector('.modal-content button:last-child');
+            const tempButtons = modal.querySelector('.temp-buttons-container');
+
+            document.getElementById('alertTitle').textContent = title;
+            document.getElementById('alertTitle').style.color = title === 'Success' ? '#10b981' : (title === 'Warning' ? '#f59e0b' : '#ef4444');
+            document.getElementById('alertMessage').textContent = message;
+            modal.classList.remove('hidden');
+            modal.style.display = 'flex'; 
+            
+            // Restore default buttons
+            if (defaultButton) defaultButton.style.display = 'block';
+            if (tempButtons) {
+                tempButtons.innerHTML = '';
+                tempButtons.style.display = 'none';
+            }
+        };
+
+        const exportDataJson = () => {
+            const dataStr = JSON.stringify(tasks, null, 2);
+            const dataUri = 'data:application/json;charset=utf-8,' + encodeURIComponent(dataStr);
+
+            const exportFileDefaultName = `kanban_data_backup_${new Date().toISOString().slice(0, 10)}.json`;
+
+            const linkElement = document.createElement('a');
+            linkElement.setAttribute('href', dataUri);
+            linkElement.setAttribute('download', exportFileDefaultName);
+            linkElement.click();
+        };
+
+        const promptImportMode = (event) => {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                try {
+                    const importedTasks = JSON.parse(e.target.result);
+                    if (Array.isArray(importedTasks)) {
+                        importedData = importedTasks; // Store data temporarily
+                        
+                        // Show confirmation/choice modal
+                        document.getElementById('importConfirmModal').classList.remove('hidden');
+                        document.getElementById('importConfirmModal').style.display = 'flex';
+                    } else {
+                        showMessage("Import failed: Invalid file format. Data must be a JSON array.", 'Error');
+                    }
+                } catch (error) {
+                    console.error("Error parsing JSON:", error);
+                    showMessage("Import failed: Error reading or parsing the file.", 'Error');
+                }
+            };
+            reader.readAsText(file);
+            // Clear input so same file can be imported again
+            event.target.value = '';
+        };
+        
+        const handleImportDecision = (mode) => {
+            if (!importedData) return;
+            
+            const importedTaskIds = new Set(importedData.map(t => t.id));
+            
+            if (mode === 'overwrite') {
+                // Completely replace tasks
+                tasks = importedData;
+                showMessage(`Successfully replaced all tasks with ${importedData.length} imported tasks.`, 'Success');
+
+            } else if (mode === 'merge') {
+                // Merge: Keep existing tasks, add imported ones that don't clash by ID
+                const existingTaskIds = new Set(tasks.map(t => t.id));
+                const newTasks = importedData.filter(t => !existingTaskIds.has(t.id));
+                const mergedCount = newTasks.length;
+                
+                tasks.push(...newTasks);
+                showMessage(`Successfully merged ${mergedCount} new tasks into the board.`, 'Success');
+            }
+            
+            // Cleanup and refresh
+            importedData = null;
+            saveTasks();
+            renderBoard();
+            document.getElementById('importConfirmModal').classList.add('hidden');
+            document.getElementById('importConfirmModal').style.display = 'none';
+        };
+        
+        // --- Custom Date Range Filter Logic (NEW) ---
+
+        const applyCustomDateFilter = () => {
+            const fromInput = document.getElementById('activityDateFrom').value;
+            const toInput = document.getElementById('activityDateTo').value;
+
+            if (!fromInput || !toInput) {
+                showMessage("Please select both a 'From' and 'To' date for the filter.", 'Warning');
+                return;
+            }
+            
+            // Normalize dates to start (00:00:00) and end (23:59:59.999) of the day
+            let startDate = new Date(fromInput);
+            startDate.setHours(0, 0, 0, 0);
+            
+            let endDate = new Date(toInput);
+            endDate.setHours(23, 59, 59, 999);
+
+            if (startDate.getTime() > endDate.getTime()) {
+                showMessage("'From' date cannot be after 'To' date. Please correct the selection.", 'Error');
+                return;
+            }
+
+            currentActivityRange = {
+                start: startDate.getTime(),
+                end: endDate.getTime()
+            };
+            
+            renderBoard();
+            
+            if (tasks.filter(task => hasActivityInRange(task, currentActivityRange)).length === 0) {
+                 showMessage("No tasks had activity within the selected date range.", 'Info');
+            }
+        };
+
+        const clearActivityFilter = () => {
+            currentActivityRange = null;
+            document.getElementById('activityDateFrom').value = '';
+            document.getElementById('activityDateTo').value = '';
+            renderBoard();
+            showMessage("Activity filter cleared. Showing all tasks.", 'Success');
+        };
+
+        // --- Kanban Board Logic ---
+
+        // Custom comparator for complex sorting
+        const sortTasks = (a, b) => {
+            const aOverdue = isOverdue(a);
+            const bOverdue = isOverdue(b);
+            
+            // 1. Overdue tasks always come first
+            if (aOverdue && !bOverdue) return -1;
+            if (!aOverdue && bOverdue) return 1;
+
+            // 2. Sort by Priority (High > Medium > Low)
+            const aPriority = PRIORITY_MAP[a.priority] || 0;
+            const bPriority = PRIORITY_MAP[b.priority] || 0;
+            if (aPriority !== bPriority) {
+                return bPriority - aPriority; // Descending
+            }
+
+            // 3. Sort by Target Date (Ascending)
+            const aDate = a.targetDate ? new Date(a.targetDate).getTime() : Infinity;
+            const bDate = b.targetDate ? new Date(b.targetDate).getTime() : Infinity;
+            if (aDate !== bDate) {
+                return aDate - bDate;
+            }
+            
+            // 4. Default to creation time (Ascending)
+            const aCreation = a.history.find(h => h.type === 'created')?.timestamp || 0;
+            const bCreation = b.history.find(h => h.type === 'created')?.timestamp || 0;
+            return aCreation - bCreation;  
+        };
+
+
+        const renderBoard = () => {
+            const boardContainer = document.getElementById('kanbanBoard');
+            boardContainer.innerHTML = '';
+            
+            // 1. Apply Activity Filter
+            let activeTasks = tasks;
+            
+            if (currentActivityRange) {
+                activeTasks = tasks.filter(task => hasActivityInRange(task, currentActivityRange));
+            }
+            
+            // 2. Create Column Structure
+            BOARD_COLUMNS.forEach(column => {
+                const columnEl = document.createElement('div');
+                columnEl.className = `kanban-column`;
+                columnEl.id = `column-${column.id}`;
+                columnEl.setAttribute('ondragover', 'allowDrop(event)');
+                columnEl.setAttribute('ondrop', `dropTask(event, '${column.id}')`);
+                columnEl.setAttribute('ondragenter', 'handleDragEnter(event)');
+                columnEl.setAttribute('ondragleave', 'handleDragLeave(event)');
+
+                const header = document.createElement('h2');
+                header.className = `column-header`;
+                header.style.backgroundColor = column.color;
+                header.innerHTML = `${column.title} <span style="font-size: 0.875rem; font-weight: 300;" id="count-${column.id}"></span>`;
+                
+                const taskListContainer = document.createElement('div');
+                taskListContainer.className = 'task-list-container';
+                taskListContainer.id = `task-list-${column.id}`;
+
+                columnEl.appendChild(header);
+                columnEl.appendChild(taskListContainer);
+                boardContainer.appendChild(columnEl);
+            });
+
+            // 3. Filter, Sort, and Render Active Tasks
+            
+            const tasksByColumn = {};
+            BOARD_COLUMNS.forEach(col => tasksByColumn[col.id] = []);
+            
+            activeTasks.forEach(task => {
+                if (tasksByColumn[task.status]) {
+                    tasksByColumn[task.status].push(task);
+                }
+            });
+            
+            // Apply sorting logic to each column array
+            BOARD_COLUMNS.forEach(col => {
+                if (tasksByColumn[col.id]) {
+                    tasksByColumn[col.id].sort(sortTasks);
+                }
+            });
+
+            // 4. Render Sorted Tasks and Update Counts
+            
+            BOARD_COLUMNS.forEach(column => {
+                const columnTasks = tasksByColumn[column.id];
+                const listEl = document.getElementById(`task-list-${column.id}`);
+
+                columnTasks.forEach(task => {
+                    const taskEl = createTaskElement(task);
+                    if (listEl) {
+                        listEl.appendChild(taskEl);
+                    }
+                });
+                // Update Counts to reflect the filtered task list
+                document.getElementById(`count-${column.id}`).textContent = `(${columnTasks.length})`;
+            });
+
+        };
+
+        const createTaskElement = (task) => {
+            const card = document.createElement('div');
+            card.className = 'task-card';
+            card.id = `task-${task.id}`;
+            card.draggable = true;
+            card.setAttribute('ondragstart', 'dragTask(event)');
+            card.onclick = () => openTaskDetails(task.id);
+            
+            // Check for overdue status and apply class
+            if (isOverdue(task)) {
+                card.classList.add('task-overdue');
+            }
+
+            const titleContainer = document.createElement('div');
+            titleContainer.style.display = 'flex';
+            titleContainer.style.justifyContent = 'space-between';
+            titleContainer.style.alignItems = 'center';
+
+            const title = document.createElement('p');
+            title.style.fontWeight = '600'; /* font-semibold */
+            title.style.color = '#1f2937'; /* text-gray-800 */
+            title.style.marginBottom = '0.25rem'; /* mb-1 */
+            title.style.wordWrap = 'break-word';
+            title.textContent = task.content;
+            
+            titleContainer.appendChild(title);
+            
+            // Priority Indicator
+            if (task.priority && task.status !== 'done') {
+                const priorityIndicator = document.createElement('span');
+                priorityIndicator.textContent = task.priority.toUpperCase();
+                priorityIndicator.style.fontSize = '0.75rem';
+                priorityIndicator.style.fontWeight = '700';
+                priorityIndicator.style.padding = '2px 6px';
+                priorityIndicator.style.borderRadius = '4px';
+                priorityIndicator.style.backgroundColor = PRIORITY_COLOR_MAP[task.priority] + '1A'; // Light background
+                priorityIndicator.style.color = PRIORITY_COLOR_MAP[task.priority];
+                titleContainer.appendChild(priorityIndicator);
+            }
+            
+            if (isOverdue(task)) {
+                 const warningIcon = document.createElement('span');
+                 warningIcon.innerHTML = '&#9888;'; // Warning triangle icon
+                 warningIcon.style.color = '#ef4444'; // Red
+                 warningIcon.style.fontSize = '1.25rem';
+                 warningIcon.title = task.targetDate ? `DUE: ${formatTargetDate(task.targetDate)}` : 'Overdue!';
+                 titleContainer.appendChild(warningIcon);
+            }
+            
+            card.appendChild(titleContainer);
+
+            // Assigned To indicator (simple display on card)
+            if (task.assignedTo) {
+                const assignedToEl = document.createElement('p');
+                assignedToEl.style.fontSize = '0.75rem';
+                assignedToEl.style.color = '#4f46e5'; /* indigo */
+                assignedToEl.style.fontWeight = '600';
+                assignedToEl.textContent = `Assigned: ${task.assignedTo}`;
+                card.appendChild(assignedToEl);
+            }
+
+
+            const date = document.createElement('p');
+            date.style.fontSize = '0.75rem'; /* text-xs */
+            date.style.color = '#6b7280'; /* text-gray-500 */
+            // The creation date is always the first history item
+            const creationEvent = task.history.find(h => h.type === 'created');
+            date.textContent = `Created: ${creationEvent ? formatDate(creationEvent.timestamp) : 'N/A'}`;
+            card.appendChild(date);
+            
+            if (task.targetDate) {
+                 const targetDateEl = document.createElement('p');
+                 targetDateEl.style.fontSize = '0.75rem';
+                 targetDateEl.style.color = isOverdue(task) ? '#ef4444' : '#4b5563'; // Red if overdue
+                 targetDateEl.style.fontWeight = isOverdue(task) ? '700' : '400';
+                 targetDateEl.textContent = `Target: ${formatTargetDate(task.targetDate)}`;
+                 card.appendChild(targetDateEl);
+            }
+
+            // Get last comment time for display
+            const lastComment = task.history.filter(h => h.type === 'comment').pop();
+            if (lastComment) {
+                const commentDate = document.createElement('p');
+                commentDate.style.fontSize = '0.75rem'; /* text-xs */
+                commentDate.style.color = '#6b7280'; /* text-gray-500 */
+                commentDate.style.marginTop = '0.25rem'; /* mt-1 */
+                commentDate.style.fontStyle = 'italic';
+                commentDate.textContent = `Last Comment: ${formatDate(lastComment.timestamp)}`;
+                card.appendChild(commentDate);
+            }
+            
+            return card;
+        };
+
+        // --- Drag & Drop Handlers ---
+        const allowDrop = (event) => {
+            event.preventDefault();
+        };
+        
+        const handleDragEnter = (event) => {
+            event.preventDefault();
+            const target = event.currentTarget.closest('.kanban-column');
+            if (target) {
+                target.classList.add('drag-over');
+            }
+        };
+
+        const handleDragLeave = (event) => {
+            const target = event.currentTarget.closest('.kanban-column');
+            if (target) {
+                target.classList.remove('drag-over');
+            }
+        };
+
+        const dragTask = (event) => {
+            event.dataTransfer.setData('text/plain', event.target.id);
+            event.dataTransfer.effectAllowed = 'move';
+        };
+
+        const dropTask = (event, newStatus) => {
+            event.preventDefault();
+            const targetColumn = event.currentTarget.closest('.kanban-column');
+            targetColumn.classList.remove('drag-over');
+
+            const data = event.dataTransfer.getData('text/plain');
+            const draggedElement = document.getElementById(data);
+            
+            if (!draggedElement || !data.startsWith('task-')) return;
+            
+            const taskId = data.replace('task-', '');
+            const task = tasks.find(t => t.id === taskId);
+            
+            if (task && task.status !== newStatus) {
+                const oldStatus = task.status;
+                task.status = newStatus;
+                
+                // Log the status change
+                const type = (oldStatus === 'done' && newStatus !== 'done') ? 'reopened' : 'status_change';
+                const details = { from: oldStatus, to: newStatus };
+                logHistory(task, type, details);
+
+                // Re-render only necessary elements
+                const taskListContainer = document.getElementById(`task-list-${newStatus}`);
+                if (taskListContainer) {
+                    taskListContainer.appendChild(draggedElement);
+                }
+                
+                renderBoard(); // Full re-render is simpler for updating counts and overdue status
+            }
+        };
+        
+        /* NEW: Helper to exit all detail modal editing modes */
+        const exitAllEditModes = () => {
+            // Status edit mode
+            const statusDisplay = document.getElementById('modalTaskStatusDisplay');
+            const statusInput = document.getElementById('modalTaskStatusInput');
+            const statusEditBtn = document.getElementById('toggleStatusEditBtn');
+            const statusSaveBtn = document.getElementById('saveStatusBtn');
+            statusDisplay.style.display = 'block';
+            statusEditBtn.style.display = 'block';
+            statusInput.style.display = 'none';
+            statusSaveBtn.style.display = 'none';
+
+            // Title/Description edit mode (main edit mode)
+            const titleDisplay = document.getElementById('modalTaskTitleDisplay');
+            const titleInput = document.getElementById('modalTaskTitleInput');
+            const titleEditBtn = document.getElementById('editTitleBtn');
+            const saveBtn = document.getElementById('saveTitleBtn');
+            const descDisplay = document.getElementById('modalTaskDescriptionDisplay');
+            const descInput = document.getElementById('modalTaskDescriptionInput');
+            const descEditBtn = document.getElementById('editDescriptionBtn'); 
+            titleDisplay.style.display = 'block';
+            titleEditBtn.style.display = 'block';
+            titleInput.style.display = 'none';
+            saveBtn.style.display = 'none'; // The main save button hides all title/description inputs
+            descDisplay.style.display = 'block';
+            descEditBtn.style.display = 'block'; 
+            descInput.style.display = 'none';
+
+            // Priority edit mode
+            const priorityDisplay = document.getElementById('modalTaskPriorityDisplay');
+            const priorityInput = document.getElementById('modalTaskPriorityInput');
+            const priorityEditBtn = document.getElementById('togglePriorityEditBtn');
+            const prioritySaveBtn = document.getElementById('savePriorityBtn');
+            priorityDisplay.style.display = 'block';
+            priorityEditBtn.style.display = 'block';
+            priorityInput.style.display = 'none';
+            prioritySaveBtn.style.display = 'none';
+            
+            // Assigned To edit mode
+            const assignedToDisplay = document.getElementById('modalTaskAssignedToDisplay');
+            const assignedToInput = document.getElementById('modalTaskAssignedToInput');
+            const assignedToEditBtn = document.getElementById('toggleAssignedToEditBtn');
+            const assignedToSaveBtn = document.getElementById('saveAssignedToBtn');
+            assignedToDisplay.style.display = 'block';
+            assignedToEditBtn.style.display = 'block';
+            assignedToInput.style.display = 'none';
+            assignedToSaveBtn.style.display = 'none';
+
+            // Email Subject edit mode
+            const subjectDisplay = document.getElementById('modalTaskEmailSubjectDisplay');
+            const subjectInput = document.getElementById('modalTaskEmailSubjectInput');
+            const subjectEditBtn = document.getElementById('toggleSubjectEditBtn');
+            const subjectSaveBtn = document.getElementById('saveSubjectBtn');
+            subjectDisplay.style.display = 'block';
+            subjectEditBtn.style.display = 'block';
+            subjectInput.style.display = 'none';
+            subjectSaveBtn.style.display = 'none';
+        }
+        
+        // --- Status Editing Logic (MODIFIED to use exitAllEditModes) ---
+        const toggleStatusEditMode = (isEditing) => {
+            const statusDisplay = document.getElementById('modalTaskStatusDisplay');
+            const statusInput = document.getElementById('modalTaskStatusInput');
+            const editBtn = document.getElementById('toggleStatusEditBtn');
+            const saveBtn = document.getElementById('saveStatusBtn');
+            
+            // Ensure other editing is off
+            if (isEditing) {
+                exitAllEditModes();
+            }
+
+            if (isEditing) {
+                statusInput.value = currentTask.status || 'todo'; // Set current value
+                statusDisplay.style.display = 'none';
+                editBtn.style.display = 'none';
+                statusInput.style.display = 'block';
+                saveBtn.style.display = 'block';
+            } else {
+                statusDisplay.style.display = 'block';
+                editBtn.style.display = 'block';
+                statusInput.style.display = 'none';
+                saveBtn.style.display = 'none';
+            }
+        };
+        
+        const saveTaskStatus = () => {
+            if (!currentTask) return;
+
+            const newStatus = document.getElementById('modalTaskStatusInput').value;
+            const oldStatus = currentTask.status;
+
+            if (newStatus !== oldStatus) {
+                currentTask.status = newStatus;
+                
+                const type = (oldStatus === 'done' && newStatus !== 'done') ? 'reopened' : 'status_change';
+                const details = { from: oldStatus, to: newStatus };
+                logHistory(currentTask, type, details);
+
+                saveTasks();
+                renderBoard(); // Important: Redraw board for task movement, sorting, and overdue status
+            } else {
+                showMessage("No change detected in the status.");
+            }
+            
+            // Update display and exit edit mode
+            const statusDisplayEl = document.getElementById('modalTaskStatusDisplay');
+            statusDisplayEl.textContent = STATUS_DISPLAY_MAP[newStatus];
+            statusDisplayEl.style.color = STATUS_COLOR_MAP[newStatus];
+            toggleStatusEditMode(false);
+        };
+
+        // --- Task Editing Logic (Title/Description) (MODIFIED to use exitAllEditModes) ---
+        
+        // Toggle function for Description only
+        const toggleDescriptionEditMode = (isEditing) => {
+            const descDisplay = document.getElementById('modalTaskDescriptionDisplay');
+            const descInput = document.getElementById('modalTaskDescriptionInput');
+            const editBtn = document.getElementById('editDescriptionBtn');
+            const saveBtn = document.getElementById('saveTitleBtn'); // Reusing the main save button
+
+            // Ensure ALL other editing modes are off
+            if (isEditing) {
+                exitAllEditModes();
+            }
+
+            if (isEditing) {
+                descInput.value = descDisplay.textContent.trim() === 'No description provided.' ? '' : descDisplay.textContent.trim();
+                descDisplay.style.display = 'none';
+                editBtn.style.display = 'none';
+                descInput.style.display = 'block';
+                saveBtn.style.display = 'block'; 
+                descInput.focus();
+            } else {
+                descDisplay.style.display = 'block';
+                editBtn.style.display = 'block';
+                descInput.style.display = 'none';
+            }
+        };
+
+        const toggleEditMode = (isEditing) => {
+            const titleDisplay = document.getElementById('modalTaskTitleDisplay');
+            const titleInput = document.getElementById('modalTaskTitleInput');
+            const editBtn = document.getElementById('editTitleBtn');
+            const saveBtn = document.getElementById('saveTitleBtn');
+            
+            const descDisplay = document.getElementById('modalTaskDescriptionDisplay');
+            const descInput = document.getElementById('modalTaskDescriptionInput');
+            const descEditBtn = document.getElementById('editDescriptionBtn'); // Added for description edit mode
+
+            // Ensure other editing modes are off when editing Title/Description
+            if (isEditing) {
+                 exitAllEditModes();
+            }
+            
+            if (isEditing) {
+                // Title
+                titleInput.value = titleDisplay.textContent;
+                titleDisplay.style.display = 'none';
+                editBtn.style.display = 'none';
+                titleInput.style.display = 'block';
+                saveBtn.style.display = 'block';
+                titleInput.focus();
+                
+                // Description
+                descInput.value = descDisplay.textContent.trim() === 'No description provided.' ? '' : descDisplay.textContent.trim();
+                descDisplay.style.display = 'none';
+                descEditBtn.style.display = 'none'; // Hide description edit button
+                descInput.style.display = 'block';
+
+            } else {
+                // Title
+                titleDisplay.style.display = 'block';
+                editBtn.style.display = 'block';
+                titleInput.style.display = 'none';
+                saveBtn.style.display = 'none';
+
+                // Description
+                descDisplay.style.display = 'block';
+                descEditBtn.style.display = 'block'; // Show description edit button
+                descInput.style.display = 'none';
+            }
+        };
+
+        const saveTaskTitleAndDescription = () => {
+            if (!currentTask) return;
+
+            const newTitle = document.getElementById('modalTaskTitleInput').value.trim();
+            const newDescription = document.getElementById('modalTaskDescriptionInput').value.trim();
+            
+            const oldTitle = currentTask.content;
+            const oldDescription = currentTask.description || '';
+
+            let titleChanged = false;
+            let descriptionChanged = false;
+
+            // 1. Check and save Title
+            if (newTitle && newTitle !== oldTitle) {
+                currentTask.content = newTitle;
+                logHistory(currentTask, 'title_edit', { oldTitle: oldTitle, newTitle: newTitle });
+                document.getElementById('modalTaskTitleDisplay').textContent = newTitle;
+                titleChanged = true;
+            }
+
+            // 2. Check and save Description
+            if (newDescription !== oldDescription) {
+                currentTask.description = newDescription || null;
+                logHistory(currentTask, 'description_edit', { 
+                    old: oldDescription.substring(0, 50) + (oldDescription.length > 50 ? '...' : ''), 
+                    new: newDescription.substring(0, 50) + (newDescription.length > 50 ? '...' : '') 
+                });
+                descriptionChanged = true;
+            }
+            
+            if (titleChanged || descriptionChanged) {
+                saveTasks();
+                renderBoard(); // Refresh the card on the board
+            } else {
+                // If nothing changed but they hit save, display a message.
+                showMessage("No changes were made to the title or description.");
+            }
+            
+            // Re-render description display and exit edit mode
+            document.getElementById('modalTaskDescriptionDisplay').textContent = currentTask.description || 'No description provided.';
+            toggleEditMode(false); 
+            toggleDescriptionEditMode(false); 
+        };
+        
+        // --- Priority Editing Logic (MODIFIED to use exitAllEditModes) ---
+        const togglePriorityEditMode = (isEditing) => {
+            const priorityDisplay = document.getElementById('modalTaskPriorityDisplay');
+            const priorityInput = document.getElementById('modalTaskPriorityInput');
+            const editBtn = document.getElementById('togglePriorityEditBtn');
+            const saveBtn = document.getElementById('savePriorityBtn');
+            
+            // Ensure other editing is off
+            if (isEditing) {
+                exitAllEditModes();
+            }
+
+            if (isEditing) {
+                priorityInput.value = currentTask.priority || 'Medium'; // Set current value
+                priorityDisplay.style.display = 'none';
+                editBtn.style.display = 'none';
+                priorityInput.style.display = 'block';
+                saveBtn.style.display = 'block';
+            } else {
+                priorityDisplay.style.display = 'block';
+                editBtn.style.display = 'block';
+                priorityInput.style.display = 'none';
+                saveBtn.style.display = 'none';
+            }
+        };
+
+        const savePriority = () => {
+            if (!currentTask) return;
+
+            const newPriority = document.getElementById('modalTaskPriorityInput').value;
+            const oldPriority = currentTask.priority;
+
+            if (newPriority !== oldPriority) {
+                currentTask.priority = newPriority;
+                
+                logHistory(currentTask, 'priority_edit', { 
+                    oldPriority: oldPriority || 'None', 
+                    newPriority: newPriority 
+                });
+                
+                saveTasks();
+                renderBoard(); // Refresh the board (to update highlighting/sorting)
+            } else {
+                showMessage("No change detected in the priority.");
+            }
+            
+            // Update display and exit edit mode
+            const priorityDisplayEl = document.getElementById('modalTaskPriorityDisplay');
+            priorityDisplayEl.textContent = newPriority;
+            priorityDisplayEl.style.color = PRIORITY_COLOR_MAP[newPriority] || '#9ca3af';
+            togglePriorityEditMode(false);
+        };
+
+        // --- Assigned To Editing Logic (MODIFIED to use exitAllEditModes) ---
+        const toggleAssignedToEditMode = (isEditing) => {
+            const assignedToDisplay = document.getElementById('modalTaskAssignedToDisplay');
+            const assignedToInput = document.getElementById('modalTaskAssignedToInput');
+            const editBtn = document.getElementById('toggleAssignedToEditBtn');
+            const saveBtn = document.getElementById('saveAssignedToBtn');
+
+            // Ensure other editing is off
+            if (isEditing) {
+                exitAllEditModes();
+            }
+
+            if (isEditing) {
+                assignedToInput.value = currentTask.assignedTo || ''; // Set current value
+                assignedToDisplay.style.display = 'none';
+                editBtn.style.display = 'none';
+                assignedToInput.style.display = 'block';
+                saveBtn.style.display = 'block';
+            } else {
+                assignedToDisplay.style.display = 'block';
+                editBtn.style.display = 'block';
+                assignedToInput.style.display = 'none';
+                saveBtn.style.display = 'none';
+            }
+        };
+
+        const saveAssignedTo = () => {
+            if (!currentTask) return;
+
+            const newAssignedTo = document.getElementById('modalTaskAssignedToInput').value.trim() || null;
+            const oldAssignedTo = currentTask.assignedTo;
+
+            if (newAssignedTo !== oldAssignedTo) {
+                currentTask.assignedTo = newAssignedTo;
+                
+                logHistory(currentTask, 'assigned_to_edit', { 
+                    oldAssignee: oldAssignedTo || 'None', 
+                    newAssignee: newAssignedTo || 'None' 
+                });
+                
+                saveTasks();
+                renderBoard(); // Refresh board to update card display
+            } else {
+                showMessage("No change detected in the assigned person.");
+            }
+            
+            // Update display and exit edit mode
+            document.getElementById('modalTaskAssignedToDisplay').textContent = newAssignedTo || 'N/A';
+            toggleAssignedToEditMode(false);
+        };
+        
+        // --- Target Date Editing Logic (MODIFIED to use exitAllEditModes) ---
+        
+        const toggleDateEditMode = (isEditing) => {
+            const dateDisplay = document.getElementById('modalTaskTargetDateDisplay');
+            const dateInput = document.getElementById('modalTaskTargetDateInput');
+            const editBtn = document.getElementById('toggleDateEditBtn');
+            const saveBtn = document.getElementById('saveDateBtn');
+            
+            // Ensure other editing is off
+            if (isEditing) {
+                exitAllEditModes();
+            }
+
+            if (isEditing) {
+                dateInput.value = currentTask.targetDate || '';
+                dateDisplay.style.display = 'none';
+                editBtn.style.display = 'none';
+                dateInput.style.display = 'block';
+                saveBtn.style.display = 'block';
+            } else {
+                dateDisplay.style.display = 'block';
+                editBtn.style.display = 'block';
+                dateInput.style.display = 'none';
+                saveBtn.style.display = 'none';
+            }
+        };
+
+        const saveTargetDate = () => {
+            if (!currentTask) return;
+
+            const newDateString = document.getElementById('modalTaskTargetDateInput').value.trim();
+            
+            // Format new date: null if empty, otherwise keep YYYY-MM-DD
+            const newDate = newDateString || null;
+            const oldDate = currentTask.targetDate;
+
+            if (newDate !== oldDate) {
+                currentTask.targetDate = newDate;
+                
+                // Log the date change
+                logHistory(currentTask, 'target_date_edit', { 
+                    oldDate: oldDate || 'None', 
+                    newDate: newDate || 'None' 
+                });
+                
+                saveTasks();
+                renderBoard(); // Refresh the board (to update highlighting)
+            } else {
+                showMessage("No change detected in the target date.");
+            }
+            
+            // Update display and exit edit mode
+            document.getElementById('modalTaskTargetDateDisplay').textContent = formatTargetDate(newDate);
+            toggleDateEditMode(false);
+        };
+        
+        // --- Email Subject Editing Logic (MODIFIED to use exitAllEditModes) ---
+        
+        const toggleSubjectEditMode = (isEditing) => {
+            const subjectDisplay = document.getElementById('modalTaskEmailSubjectDisplay');
+            const subjectInput = document.getElementById('modalTaskEmailSubjectInput');
+            const editBtn = document.getElementById('toggleSubjectEditBtn');
+            const saveBtn = document.getElementById('saveSubjectBtn');
+            
+            // Ensure other editing is off
+            if (isEditing) {
+                exitAllEditModes(); 
+            }
+
+            if (isEditing) {
+                subjectInput.value = currentTask.emailSubject || '';
+                subjectDisplay.style.display = 'none';
+                editBtn.style.display = 'none';
+                subjectInput.style.display = 'block';
+                saveBtn.style.display = 'block';
+                subjectInput.focus();
+            } else {
+                subjectDisplay.style.display = 'block';
+                editBtn.style.display = 'block';
+                subjectInput.style.display = 'none';
+                saveBtn.style.display = 'none';
+            }
+        };
+
+        const saveEmailSubject = () => {
+            if (!currentTask) return;
+
+            const newSubject = document.getElementById('modalTaskEmailSubjectInput').value.trim() || null;
+            const oldSubject = currentTask.emailSubject;
+
+            if (newSubject !== oldSubject) {
+                currentTask.emailSubject = newSubject;
+                
+                logHistory(currentTask, 'email_subject_edit', { 
+                    oldSubject: oldSubject || 'None', 
+                    newSubject: newSubject || 'None' 
+                });
+                
+                saveTasks();
+            } else {
+                showMessage("No change detected in the email subject.");
+            }
+            
+            // Update display and exit edit mode
+            document.getElementById('modalTaskEmailSubjectDisplay').textContent = newSubject || 'N/A';
+            toggleSubjectEditMode(false);
+        };
+        
+        // --- Task Deletion Logic ---
+        
+        const deleteTask = (taskId) => {
+            // Using a custom modal for confirmation since native browser alerts/confirms are forbidden
+            const confirmDeletion = () => {
+                // Remove the task from the array
+                tasks = tasks.filter(t => t.id !== taskId);
+                saveTasks();
+                
+                // Close all modals and re-render the board
+                closeTaskDetails();
+                document.getElementById('messageAlertModal').classList.add('hidden');
+                document.getElementById('messageAlertModal').style.display = 'none';
+                renderBoard();
+            };
+
+            // Display confirmation modal
+            const modal = document.getElementById('messageAlertModal');
+            document.getElementById('alertTitle').textContent = "Confirm Deletion";
+            document.getElementById('alertMessage').innerHTML = `<p style="color: #ef4444; font-weight: 600;">Are you sure you want to permanently delete this task?</p>`;
+
+            // Accessing the element created in showMessage
+            const defaultButton = modal.querySelector('.modal-content button:last-child');
+            defaultButton.style.display = 'none'; // Hide default OK button
+
+            let buttonsContainer = modal.querySelector('.temp-buttons-container');
+            if (!buttonsContainer) {
+                buttonsContainer = document.createElement('div');
+                buttonsContainer.className = 'temp-buttons-container';
+                buttonsContainer.style.display = 'flex';
+                buttonsContainer.style.justifyContent = 'space-between';
+                buttonsContainer.style.marginTop = '1.5rem';
+                
+                modal.querySelector('.modal-content').appendChild(buttonsContainer);
+            }
+            buttonsContainer.innerHTML = ''; // Clear previous buttons
+            buttonsContainer.style.display = 'flex'; // Show buttons container
+
+            const btnCancel = document.createElement('button');
+            btnCancel.textContent = 'Cancel';
+            btnCancel.style.cssText = "padding: 0.5rem 1rem; background-color: #d1d5db; color: #1f2937; border-radius: 0.5rem; transition: background-color 0.2s;";
+            btnCancel.onclick = () => { 
+                modal.classList.add('hidden'); 
+                modal.style.display = 'none';
+                buttonsContainer.style.display = 'none';
+                defaultButton.style.display = 'block'; // Restore default button
+            };
+            
+            const btnConfirm = document.createElement('button');
+            btnConfirm.textContent = 'Confirm Delete';
+            btnConfirm.style.cssText = "padding: 0.5rem 1rem; background-color: #ef4444; color: white; font-weight: 600; border-radius: 0.5rem; transition: background-color 0.2s; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);";
+            btnConfirm.onclick = () => confirmDeletion();
+
+            buttonsContainer.appendChild(btnCancel);
+            buttonsContainer.appendChild(btnConfirm);
+
+            modal.classList.remove('hidden');
+            modal.style.display = 'flex';
+        };
+        
+        // --- Helper to format history for CSV ---
+        const formatHistoryForCSV = (history) => {
+			if (!history || history.length === 0) return "No history.";
+
+			// Sort history by timestamp ascending
+			history.sort((a, b) => a.timestamp - b.timestamp);
+
+			const entries = history
+				.filter(item => item.type === 'comment') // ONLY include comments
+				.map(item => {
+					const timestamp = new Date(item.timestamp).toLocaleString();
+					// Clean the comment text to remove line breaks that break CSV rows
+					const cleanText = item.details.text.replace(/[\r\n]+/g, ' ');
+					return `[${timestamp}] COMMENT: ${cleanText}`;
+				});
+
+			return entries.length > 0 ? entries.join(" | ") : "No comments logged.";
+		};
+        
+        // Delete Comment Function
+        const deleteComment = (taskId, timestamp) => {
+            const task = tasks.find(t => t.id === taskId);
+            if (!task) return;
+
+            // Filter out the specific comment based on its timestamp
+            const initialLength = task.history.length;
+            task.history = task.history.filter(item => {
+                // Only target 'comment' type entries with the matching timestamp
+                return !(item.type === 'comment' && item.timestamp === timestamp);
+            });
+
+            if (task.history.length < initialLength) {
+                saveTasks();
+                renderHistory(task.history); // Refresh the history view immediately
+                renderBoard(); // Update the card (removes "Last Comment" if the last one was deleted)
+            } else {
+                showMessage("Failed to find or delete comment.", 'Error');
+            }
+        };
+
+
+        // --- Modal/Detail Logic ---
+
+        const openTaskDetails = (taskId) => {
+            currentTask = tasks.find(t => t.id === taskId);
+            if (!currentTask) return;
+
+            // 1. Ensure edit modes are off before opening
+            exitAllEditModes();
+            
+            // 2. Set static displays
+            document.getElementById('modalTaskTitleDisplay').textContent = currentTask.content;
+            document.getElementById('modalTaskId').textContent = currentTask.id;
+            
+            // 3. Set Status Display and Input
+            const currentStatus = currentTask.status || 'todo';
+            const statusDisplayEl = document.getElementById('modalTaskStatusDisplay');
+            statusDisplayEl.textContent = STATUS_DISPLAY_MAP[currentStatus];
+            statusDisplayEl.style.color = STATUS_COLOR_MAP[currentStatus];
+            document.getElementById('modalTaskStatusInput').value = currentStatus;
+            
+            // 4. Set Priority Display and Input
+            const priorityDisplayEl = document.getElementById('modalTaskPriorityDisplay');
+            priorityDisplayEl.textContent = currentTask.priority || 'N/A';
+            priorityDisplayEl.style.color = PRIORITY_COLOR_MAP[currentTask.priority] || '#9ca3af';
+            document.getElementById('modalTaskPriorityInput').value = currentTask.priority || 'Medium';
+
+            // 5. Set Assigned To Display and Input
+            document.getElementById('modalTaskAssignedToDisplay').textContent = currentTask.assignedTo || 'N/A';
+            document.getElementById('modalTaskAssignedToInput').value = currentTask.assignedTo || '';
+
+            // 6. Set Date Display & Input
+            document.getElementById('modalTaskTargetDateDisplay').textContent = formatTargetDate(currentTask.targetDate);
+            document.getElementById('modalTaskTargetDateInput').value = currentTask.targetDate || '';
+            
+            // 7. Display Description and Subject
+            document.getElementById('modalTaskDescriptionDisplay').textContent = currentTask.description || 'No description provided.';
+            document.getElementById('modalTaskEmailSubjectDisplay').textContent = currentTask.emailSubject || 'N/A';
+            document.getElementById('modalTaskEmailSubjectInput').value = currentTask.emailSubject || '';
+
+
+            renderHistory(currentTask.history);
+
+            document.getElementById('taskDetailModal').classList.remove('hidden');
+            document.getElementById('taskDetailModal').style.display = 'flex'; // Ensure display is 'flex'
+        };
+
+        const closeTaskDetails = () => {
+            currentTask = null;
+            document.getElementById('commentInput').value = '';
+            document.getElementById('taskDetailModal').classList.add('hidden');
+            document.getElementById('taskDetailModal').style.display = 'none'; // Ensure display is 'none'
+            exitAllEditModes();
+        };
+
+        const renderHistory = (history) => {
+            const historyList = document.getElementById('historyList');
+            historyList.innerHTML = '';
+            document.getElementById('noHistoryMessage').classList.add('hidden');
+
+            if (history.length === 0) {
+                document.getElementById('noHistoryMessage').classList.remove('hidden');
+                return;
+            }
+
+            // Sort history by timestamp ascending
+            history.sort((a, b) => a.timestamp - b.timestamp).forEach(item => {
+                const li = document.createElement('li');
+                li.style.padding = '0.75rem';
+                li.style.borderRadius = '0.5rem';
+                li.style.boxShadow = '0 1px 2px 0 rgba(0, 0, 0, 0.05)';
+                li.style.border = '1px solid #e5e7eb';
+                
+                const timeSpan = `<span style="font-size: 0.75rem; color: #6366f1; display: block;">${formatDate(item.timestamp)}</span>`;
+                let content = '';
+                let iconColor = '';
+                let iconChar = '&#9679;'; // Solid dot
+                let deleteButtonHtml = ''; 
+
+                switch (item.type) {
+                    case 'created':
+                        content = `<p style="font-weight: 600; color: #374151;">Task created.</p>`;
+                        iconColor = '#10b981'; /* green */
+                        break;
+                    case 'comment':
+                        content = `<p style="font-weight: 500; color: #374151;">Comment: <span style="font-style: italic; color: #4b5563;">${item.details.text}</span></p>`;
+                        iconColor = '#3b82f6'; /* blue */
+                        // Comment Delete Button
+                        deleteButtonHtml = `<button onclick="deleteComment('${currentTask.id}', ${item.timestamp})" style="margin-left: auto; color: #ef4444; font-size: 0.9rem; cursor: pointer; background: none; border: none; padding: 0.25rem 0.5rem; opacity: 0.7;" title="Delete Comment">
+                                                &#10005; 
+                                            </button>`;
+                        break;
+                    case 'status_change':
+                        content = `<p style="font-weight: 500; color: #374151;">Status changed from <span style="font-family: monospace; background-color: #e5e7eb; padding: 1px 4px; border-radius: 4px;">${item.details.from.replace('-', ' ')}</span> to <span style="font-family: monospace; background-color: #e5e7eb; padding: 1px 4px; border-radius: 4px;">${item.details.to.replace('-', ' ')}</span>.</p>`;
+                        iconColor = '#f59e0b'; /* yellow */
+                        break;
+                    case 'reopened':
+                        content = `<p style="font-weight: 700; color: #ef4444;">Task REOPENED: Moved from 'done' to <span style="font-family: monospace; background-color: #fee2e2; padding: 1px 4px; border-radius: 4px;">${item.details.to.replace('-', ' ')}</span>.</p>`;
+                        iconColor = '#ef4444'; /* red */
+                        break;
+                    case 'title_edit':
+                        content = `<p style="font-weight: 700; color: #4f46e5;">Title updated from: "<span style="font-style: italic; font-weight: 400;">${item.details.oldTitle}</span>" to "<span style="font-style: italic; font-weight: 400;">${item.details.newTitle}</span>".</p>`;
+                        iconColor = '#4f46e5'; /* indigo */
+                        break;
+                    case 'description_edit':
+                        content = `<p style="font-weight: 700; color: #059669;">Description updated. Old snippet: "<span style="font-style: italic; font-weight: 400;">${item.details.old}</span>", New snippet: "<span style="font-style: italic; font-weight: 400;">${item.details.new}</span>".</p>`;
+                        iconColor = '#059669'; /* dark green */
+                        break;
+                    case 'target_date_edit':
+                        content = `<p style="font-weight: 700; color: #f59e0b;">Target Date updated from: <span style="font-style: italic; font-weight: 400;">${formatTargetDate(item.details.oldDate)}</span> to <span style="font-style: italic; font-weight: 400;">${formatTargetDate(item.details.newDate)}</span>.</p>`;
+                        iconColor = '#f59e0b'; /* yellow/orange */
+                        break;
+                    case 'priority_edit':
+                        content = `<p style="font-weight: 700; color: #dc2626;">Priority updated from: <span style="font-style: italic; font-weight: 400;">${item.details.oldPriority}</span> to <span style="font-style: italic; font-weight: 400;">${item.details.newPriority}</span>.</p>`;
+                        iconColor = '#dc2626'; /* red */
+                        break;
+                    case 'email_subject_edit':
+                        content = `<p style="font-weight: 700; color: #9333ea;">Email Subject updated from: "<span style="font-style: italic; font-weight: 400;">${item.details.oldSubject}</span>" to "<span style="font-style: italic; font-weight: 400;">${item.details.newSubject}</span>".</p>`;
+                        iconColor = '#9333ea'; /* violet */
+                        break;
+                    case 'assigned_to_edit':
+                        content = `<p style="font-weight: 700; color: #4f46e5;">Assigned To updated from: "<span style="font-style: italic; font-weight: 400;">${item.details.oldAssignee}</span>" to "<span style="font-style: italic; font-weight: 400;">${item.details.newAssignee}</span>".</p>`;
+                        iconColor = '#4f46e5'; /* indigo */
+                        break;
+                    default:
+                        content = `<p style="font-weight: 500; color: #6b7280;">Unknown event (${item.type}).</p>`;
+                        iconColor = '#6b7280';
+                }
+                
+                // Inject the delete button HTML for comments
+                li.innerHTML = `<div style="display: flex; align-items: flex-start; gap: 0.5rem; width: 100%;">
+                                    <div style="color: ${iconColor};">${iconChar}</div>
+                                    <div style="flex-grow: 1;">${timeSpan}${content}</div>
+                                    ${deleteButtonHtml}
+                                </div>`;
+                historyList.appendChild(li);
+            });
+        };
+
+        // --- Event Handlers ---
+
+        const handleAddTask = () => {
+            const titleInput = document.getElementById('newTaskTitle');
+            const priorityInput = document.getElementById('newTaskPriority'); // Capture Priority
+            const assignedToInput = document.getElementById('newTaskAssignedTo'); // NEW: Assigned To
+            const dateInput = document.getElementById('newTaskTargetDate');
+            const subjectInput = document.getElementById('newTaskEmailSubject');
+            const descriptionInput = document.getElementById('newTaskDescription');
+            
+            const title = titleInput.value.trim();
+            const priority = priorityInput.value; // Capture priority value
+            const assignedTo = assignedToInput.value.trim(); // NEW: Assigned To value
+            const targetDate = dateInput.value.trim();
+            const emailSubject = subjectInput.value.trim();
+            const description = descriptionInput.value.trim();
+            
+            const modal = document.getElementById('newTaskModal'); 
+
+            if (!title) {
+                // If title is empty, show alert message
+                showMessage("Please enter a title for your new task.");
+                return;
+            }
+
+            // Check for duplicate email subject, if one is provided
+            if (emailSubject) {
+                const normalizedSubject = emailSubject.toLowerCase();
+                const isDuplicate = tasks.some(task => 
+                    task.emailSubject && task.emailSubject.toLowerCase() === normalizedSubject
+                );
+
+                if (isDuplicate) {
+                    // If duplicate found, show confirmation dialog instead of creating immediately
+                    confirmDuplicateSubject(title, priority, assignedTo, targetDate, emailSubject, description, modal);
+                    return; // Stop here, action continues in confirmation dialog
+                }
+            }
+
+            // Proceed with normal task creation
+            createTask(title, priority, assignedTo, targetDate, emailSubject, description, modal);
+        };
+        
+        // New function to handle confirmation logic (Updated to include assignedTo)
+        const confirmDuplicateSubject = (title, priority, assignedTo, targetDate, emailSubject, description, modal) => {
+            const tempModal = document.getElementById('messageAlertModal');
+            const defaultButton = tempModal.querySelector('.modal-content button:last-child');
+            let buttonsContainer = tempModal.querySelector('.temp-buttons-container');
+
+            document.getElementById('alertTitle').textContent = "Duplicate Email Subject";
+            document.getElementById('alertMessage').innerHTML = `<p style="color: #f59e0b; font-weight: 600;">The email subject "${emailSubject}" already exists in an active task.</p><p>Do you want to create a new task with the same subject?</p>`;
+            
+            // Hide default OK button
+            defaultButton.style.display = 'none';
+
+            if (!buttonsContainer) {
+                buttonsContainer = document.createElement('div');
+                buttonsContainer.className = 'temp-buttons-container';
+                buttonsContainer.style.display = 'flex';
+                buttonsContainer.style.justifyContent = 'space-between';
+                buttonsContainer.style.marginTop = '1.5rem';
+                tempModal.querySelector('.modal-content').appendChild(buttonsContainer);
+            }
+            buttonsContainer.innerHTML = '';
+            buttonsContainer.style.display = 'flex';
+
+            const btnCancel = document.createElement('button');
+            btnCancel.textContent = 'Edit Subject';
+            btnCancel.style.cssText = "padding: 0.5rem 1rem; background-color: #d1d5db; color: #1f2937; border-radius: 0.5rem; transition: background-color 0.2s;";
+            btnCancel.onclick = () => { 
+                tempModal.classList.add('hidden'); 
+                tempModal.style.display = 'none';
+                buttonsContainer.style.display = 'none';
+                defaultButton.style.display = 'block';
+            };
+            
+            const btnConfirm = document.createElement('button');
+            btnConfirm.textContent = 'Proceed Anyway';
+            btnConfirm.style.cssText = "padding: 0.5rem 1rem; background-color: #f59e0b; color: white; border-radius: 0.5rem; transition: background-color 0.2s; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);";
+            btnConfirm.onclick = () => {
+                createTask(title, priority, assignedTo, targetDate, emailSubject, description, modal);
+                tempModal.classList.add('hidden');
+                tempModal.style.display = 'none';
+            };
+
+            buttonsContainer.appendChild(btnCancel);
+            buttonsContainer.appendChild(btnConfirm);
+
+            tempModal.classList.remove('hidden');
+            tempModal.style.display = 'flex';
+        };
+        
+        // Core task creation logic extracted (Updated to include assignedTo)
+        const createTask = (title, priority, assignedTo, targetDate, emailSubject, description, modal) => {
+            const newTask = {
+                id: generateId(),
+                content: title,
+                status: 'todo',
+                priority: priority, 
+                assignedTo: assignedTo || null, // NEW Field
+                targetDate: targetDate || null, 
+                emailSubject: emailSubject || null,
+                description: description || null,
+                history: []
+            };
+
+            logHistory(newTask, 'created');
+            tasks.push(newTask);
+            saveTasks();
+            
+            // Clear inputs and close the creation modal
+            document.getElementById('newTaskTitle').value = '';
+            document.getElementById('newTaskPriority').value = 'Medium'; // Reset priority
+            document.getElementById('newTaskAssignedTo').value = ''; // NEW: Reset assigned to
+            document.getElementById('newTaskTargetDate').value = '';
+            document.getElementById('newTaskEmailSubject').value = '';
+            document.getElementById('newTaskDescription').value = '';
+            modal.classList.add('hidden');
+            modal.style.display = 'none';
+            renderBoard();
+        };
+
+
+        const handleAddComment = () => {
+            const commentInput = document.getElementById('commentInput');
+            const commentText = commentInput.value.trim();
+
+            if (commentText && currentTask) {
+                logHistory(currentTask, 'comment', { text: commentText });
+                commentInput.value = '';
+                renderHistory(currentTask.history); // Refresh modal history
+                renderBoard(); // Refresh card display (for last comment date)
+            }
+        };
+        
+        // --- Export Logic ---
+                
+        function exportToExcel() {
+            const filter = document.getElementById('exportFilterSelect').value;
+            let data = tasks;
+            
+            if (filter !== 'all') {
+                data = tasks.filter(task => task.status === filter);
+            }
+            
+            if (!data || data.length === 0) {
+                showMessage("No tasks match the selected filter to export.");
+                return;
+            }
+
+            const escapeCSV = (value) => {
+                if (value === null || value === undefined) return "";
+                // Replace double quotes with two double quotes, and wrap the entire string in double quotes
+                const str = String(value).replace(/"/g, '""');
+                return `"${str}"`;
+            };
+
+            let csv = [];
+
+            // Header row (UPDATED)
+            csv.push([
+                "ID",
+                "Title",
+                "Description",
+                "Status",
+                "Priority",
+                "Assigned To",
+                "Target Date",
+                "Email Subject",
+                "Created Date",
+                "Activity History" 
+            ]);
+
+            // Data rows (UPDATED)
+            data.forEach(task => {
+                const created = task.history.find(h => h.type === "created")?.timestamp;
+                const historyString = formatHistoryForCSV(task.history); // Get formatted history
+
+                csv.push([
+                    escapeCSV(task.id),
+                    escapeCSV(task.content),
+                    escapeCSV(task.description || ""),
+                    escapeCSV(task.status),
+                    escapeCSV(task.priority),
+                    escapeCSV(task.assignedTo || ""),
+                    escapeCSV(task.targetDate || ""),
+                    escapeCSV(task.emailSubject || ""),
+                    escapeCSV(created ? new Date(created).toLocaleString() : ""),
+                    escapeCSV(historyString) 
+                ]);
+            });
+
+            // Join rows
+            const csvString = csv.map(r => r.join(",")).join("\r\n");
+
+            // Add UTF-8 BOM for Excel compatibility
+            const csvWithBOM = "\uFEFF" + csvString;
+
+            // Create download link
+            const blob = new Blob([csvWithBOM], { type: "text/csv;charset=utf-8;" });
+            const url = URL.createObjectURL(blob);
+
+            const link = document.createElement("a");
+            link.href = url;
+            link.download = `kanban_export_${new Date().toISOString().slice(0,10)}.csv`;
+            link.click();
+
+            URL.revokeObjectURL(url);
+                    
+        };
+
+        // --- Initialization and Event Listeners ---
+
+        document.addEventListener('DOMContentLoaded', () => {
+            loadTasks();
+            renderBoard();
+
+            document.getElementById('addTaskBtn').addEventListener('click', handleAddTask);
+            document.getElementById('addCommentBtn').addEventListener('click', handleAddComment);
+            document.getElementById('exportBtn').addEventListener('click', exportToExcel);
+        });
+    </script>
+</body>
+</html>
