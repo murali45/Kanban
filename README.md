@@ -5,7 +5,7 @@ A high-performance, privacy-focused Kanban board designed for professional task 
 ## 🚀 Get the Next Version (Desktop)
 The **Next Version** of this tool is now available as a standalone desktop application for Windows and Linux. This version provides a native experience with enhanced features and performance.
 
-👉 **[Get the Next Version on Gumroad](https://muralikrishna31.gumroad.com/l/Kanban)**
+👉 **[Get the Next Version on Gumroad](mk45.gumroad.com/l/Kanban)**
 
 ---
 
@@ -38,5 +38,6 @@ This project is licensed under the **PolyForm Noncommercial License 1.0.0**.
 
 * **Permitted Use:** You are free to use, modify, and distribute this software for personal study, hobby projects, research, and use by non-commercial organizations (charities, schools, etc.).
 * **Prohibited Use:** Any use for commercial advantage or monetary compensation—including selling the software or using it for for-profit business operations—is strictly prohibited.
+
 
 For complete legal terms, please refer to the `LICENSE` file in this repository.
